@@ -39,17 +39,33 @@ A Make.com workflow monitors a Google Drive folder for incoming scanned document
 ## Workflow Architecture
 
 ```
-Google Drive (watch folder)
-  └─ Download file
-       └─ Make AI Content Extractor (base module)
-            └─ Google Gemini 2.0 Flash Vision API
-                 └─ JSON Parse (structured output)
-                      └─ Router: confidence score
-                           ├─ ≥ 0.7 → Iterator → Router: doc type
-                           │              ├─ pick_ticket → Master_Inventory (deduct qty)
-                           │              └─ packing_slip → Transaction_Log (record)
+[1] Google Drive — Watch Files in a Folder
+  └─ [5] Google Drive — Download a File
+       └─ [38] Make AI Content Extractor — Extract text from an image
+            └─ [2] Google Gemini AI — Generate a response (full prompt below)
+                 └─ [6] JSON — Parse JSON
+                      └─ [8] Router — overall_confidence score
                            │
-                           └─ < 0.7 → Review_Queue Sheet + Gmail alert
+                           ├─ ≥ 0.7 (High Confidence)
+                           │    └─ Iterator (one item at a time)
+                           │         └─ [22] Router — document_type
+                           │              ├─ packing_slip (Incoming Delivery)
+                           │              │    └─ [23] Sheets: Search Rows
+                           │              │         └─ [25] Sheets: Update a Row (add qty)
+                           │              │              └─ [29] Sheets: Add a Row (Transaction_Log)
+                           │              │
+                           │              └─ pick_ticket (Outgoing Delivery)
+                           │                   └─ [24] Sheets: Search Rows
+                           │                        └─ [26] Sheets: Update a Row (deduct qty)
+                           │                             └─ [30] Sheets: Add a Row (Transaction_Log)
+                           │                                  └─ [40] Array Aggregator
+                           │                                       └─ [33] Sheets: Search Rows Advanced
+                           │                                            (select * where D <= E)
+                           │                                            └─ [34] Gmail — Low Stock Alert
+                           │
+                           └─ < 0.7 (Low Confidence)
+                                └─ [n] Sheets: Add a Row (Review_Queue)
+                                     └─ [n] Gmail — Manual Review Alert
 ```
 
 ---
@@ -94,27 +110,70 @@ Row is highlighted red in Google Sheets. Low-confidence items never touch invent
 
 ---
 
+## Test Document Design
+
+The workflow was tested against a realistic set of documents — not just happy-path cases.
+
+**Pick tickets** — unified internal format from Automation Auto Parts (AAP). Clean, consistent layout.
+
+**Packing slips** — multiple vendors with different layouts, fonts, and formatting:
+- BrakeMax Distributors (professional formatted)
+- Everlast Batteries (different header style, teal/gold branding)
+- Industrial Fasteners Inc. — **deliberately degraded**: faded text, low contrast, hard to read. Used to validate the low-confidence path actually works.
+
+The Industrial Fasteners document is what you see in Review_Queue with score 0.6. That wasn't an accident — it was a test case.
+
+---
+
 ## Gemini Prompt
 
-The core extraction prompt sent to Gemini 2.0 Flash:
+The actual prompt used in the Google Gemini AI module:
 
 ```
-You are a warehouse document processor. Extract the following fields from this document image:
-- document_type: "pick_ticket" or "packing_slip"
-- part_number: the part/SKU identifier
-- quantity: numeric quantity (integer)
-- confidence: your confidence score from 0.0 to 1.0
+You are an inventory management AI analyzing shipping documents for Automation Auto Parts.
 
-Return ONLY valid JSON. No explanation, no markdown.
+TASK: Extract structured data from the document below.
 
-Example output:
+RULES:
+1. Identify if this is a "packing_slip" (incoming delivery from vendor) or "pick_ticket" (outgoing shipment to customer)
+2. Extract vendor/customer name
+3. Extract document date in YYYY-MM-DD format
+4. Extract ALL item details with part numbers and quantities
+5. Assign confidence scores (0.0-1.0) for each item based on field clarity:
+   - 1.0 = perfectly clear
+   - 0.7-0.9 = mostly clear, minor uncertainty
+   - 0.4-0.6 = somewhat unclear
+   - 0.0-0.3 = very unclear or missing data
+6. If part numbers are unclear, quantities are ambiguous, or text is faded/damaged, set confidence < 0.7
+
+CRITICAL OUTPUT FORMAT:
+Your response must start IMMEDIATELY with {
+Do NOT write "json" or any word before the opening brace
+Do NOT use markdown, code blocks, or backticks
+Your ENTIRE response = the JSON object only
+First character: {    Last character: }    Nothing else
+
+Required JSON structure:
 {
-  "document_type": "pick_ticket",
-  "part_number": "AB-1042",
-  "quantity": 2,
-  "confidence": 0.94
+  "document_type": "packing_slip or pick_ticket",
+  "vendor_or_customer": "company name",
+  "date": "YYYY-MM-DD",
+  "items": [
+    {
+      "part_number": "exact part number from document",
+      "description": "item description",
+      "quantity": number,
+      "confidence": 0.0-1.0
+    }
+  ],
+  "overall_confidence": 0.0-1.0
 }
+
+DOCUMENT TEXT:
+[38. Text]
 ```
+
+The `overall_confidence` field drives the Router 8 decision. Items array is processed one-at-a-time by the Iterator module downstream.
 
 ---
 
