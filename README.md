@@ -177,6 +177,32 @@ The `overall_confidence` field drives the Router 8 decision. Items array is proc
 
 ---
 
+## Email Alerts
+
+There are two separate email alerts in the system, triggered by completely different conditions.
+
+### 1. Manual Review Alert (low confidence path)
+**Trigger:** `overall_confidence < 0.7`
+**When:** Immediately, before any inventory is touched
+**Recipients:** Warehouse manager
+**Subject:** `MANUAL REVIEW REQUIRED: [document name]`
+**Body:** Document name, confidence score, instruction to check Review_Queue sheet and process manually
+
+The document is flagged in Review_Queue and the workflow ends — no inventory changes are made.
+
+### 2. Low Stock Alert (pick ticket path only)
+**Trigger:** After pick ticket inventory deductions, any part where `Qty On Hand ≤ Reorder Point`
+**When:** After inventory is updated
+**Recipients:** Warehouse manager
+**Subject:** `⚠ LOW STOCK ALERT - Parts Below Reorder Point: [part number]`
+**Body:** Part number, current stock count, reorder threshold, instruction to place reorder
+
+The query that finds eligible parts: `select * where D <= E` (D = Qty On Hand, E = Reorder Point) on Master_Inventory. The Array Aggregator module collects all flagged parts from the run first — one email per document, not one per part.
+
+**Note:** Low stock alerts only fire on pick tickets (outbound). Packing slips add inventory — they don't trigger reorder checks.
+
+---
+
 ## Technical Challenges
 
 These were the real bugs — the ones that looked like they should work until they didn't.
