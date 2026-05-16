@@ -64,19 +64,33 @@ Three Google Sheets act as the database:
 | `Transaction_Log` | Record of every processed document |
 | `Review_Queue` | Low-confidence extractions awaiting human review |
 
-### Sample Master_Inventory schema
+### Master_Inventory
 
-| part_number | description | qty_on_hand | reorder_point | reorder_qty |
-|-------------|-------------|-------------|---------------|-------------|
-| AB-1042 | Air Brake Valve | 12 | 5 | 20 |
-| HL-2210 | Headlamp Assembly | 3 | 5 | 15 |
+| Internal Part # | Vendor Interchange | Description | Qty On Hand | Reorder Point | Last Updated |
+|----------------|-------------------|-------------|-------------|---------------|--------------|
+| AAP-BRAKE-PAD-F150 | BMX-BP-F150-FR | Front Brake Pads (Ford F-150) | 44 | 10 | 10/26/2025 9:42 PM |
+| AAP-OIL-FILTER-STD | FTS-OF-2840 | Standard Oil Filter | 272 | 75 | 10/26/2025 9:49 PM |
+| AAP-COOLANT-1GAL | FTS-AF-1000 | Coolant/Antifreeze (1 Gallon) | 73 | 30 | 10/26/2025 9:49 PM |
 
-### Sample Transaction_Log schema
+Note the **Vendor Interchange** column — packing slips arrive with vendor part numbers (BMX-BP-F150-FR). The workflow resolves them to internal AAP numbers before updating stock.
 
-| timestamp | doc_type | part_number | qty | confidence | status |
-|-----------|----------|-------------|-----|------------|--------|
-| 2025-01-15 09:32 | pick_ticket | AB-1042 | 2 | 0.94 | processed |
-| 2025-01-15 09:41 | packing_slip | HL-2210 | 5 | 0.61 | review_queue |
+### Transaction_Log
+
+| Timestamp | Doc Type | Part # | Qty Change | Prev Bal | New Bal | Confidence |
+|-----------|----------|--------|------------|----------|---------|------------|
+| 10/26 21:37 | pick_ticket | AAP-BRAKE-PAD-F150 | -10 | 24 | 14 | 1.0 |
+| 10/26 21:38 | packing_slip | FTS-AF-1000 | +50 | 25 | 75 | 1.0 |
+| 10/26 21:42 | packing_slip | BMX-BP-F150-FR | +30 | 14 | 44 | 1.0 |
+
+Pick tickets = negative qty (outbound). Packing slips = positive qty (inbound).
+
+### Review_Queue
+
+| Timestamp | Document Name | Issue | Status |
+|-----------|--------------|-------|--------|
+| 10/26 21:54 | ZPIC2-IndustrialFasteners_PackingSlip_Sept21.png | LOW CONFIDENCE EXTRACTION - Score: 0.6 | Pending Review |
+
+Row is highlighted red in Google Sheets. Low-confidence items never touch inventory — they wait for human review.
 
 ---
 
