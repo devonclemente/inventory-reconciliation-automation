@@ -234,13 +234,17 @@ See [/sample-data](./sample-data/) for document formats.
 
 ## Results
 
-| Metric | Before | After |
-|--------|--------|-------|
-| Processing delay | 2-3 months | Real-time |
-| Accuracy | Manual, error-prone | 98% |
-| Daily throughput | ~0 (backlogged) | 50 documents/day |
-| Staff search time | Up to 1 hr/day | Eliminated |
-| Low-stock alerts | None | Automated |
+This project was built as a capstone simulation — a fictional company (Automation Auto Parts) modeled closely on a real business problem. It was not deployed to production. The metrics below reflect test results on the simulated document set and projected business impact based on the actual problem it was designed to solve.
+
+| Metric | Current State (Real Business) | Simulated Result |
+|--------|-------------------------------|-----------------|
+| Processing delay | 2-3 months (manual backlog) | Real-time |
+| Extraction accuracy | N/A (manual, error-prone) | 98% on test documents |
+| Daily throughput | ~0 (backlogged) | 50 documents/day (projected) |
+| Staff search time | Up to 1 hr/day | Eliminated (projected) |
+| Low-stock alerts | None | Automated — demonstrated in testing |
+
+The automation works as designed. The business owner was not willing to adopt new systems — see [The Problem](#the-problem).
 
 ---
 
