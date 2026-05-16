@@ -24,15 +24,19 @@ The JSON parser expects raw JSON. It saw a string and failed.
 
 ---
 
-## 2. Confidence Scoring Unreliable on Scanned Documents
+## 2. Document Extractor Breaks the Confidence System
 
-**The symptom:** The confidence score on the same document varied between runs. A scan that came back 0.91 one run would return 0.63 the next. The 0.7 threshold was routing documents inconsistently.
+**The symptom:** Testing with deliberately degraded, hard-to-read documents — faded text, low contrast, poor scan quality — was returning confidence scores of 1.0. Every document was "perfectly clear" regardless of actual readability.
 
-**The cause:** Make's AI Content Extractor pre-processes files before sending them to Gemini — it applies its own document parsing layer. On grayscale warehouse scans, that pre-processing was introducing noise.
+**The cause:** This is a fundamental architectural issue, not a bug. Make's AI Content Extractor runs OCR on the file *before* passing anything to Gemini. It converts the image to clean text first. By the time Gemini sees it, the faded image is already clean characters — the visual quality information is gone. The computer could read it perfectly no matter what it looked like.
 
-**The fix:** Switched to image mode. Instead of treating the file as a "document" through Make's extractor, the workflow now passes the file as a raw image directly to the Gemini Vision API. Gemini assesses the image without Make's pre-processing layer. Confidence scores became stable and consistent.
+A confidence score based on clean extracted text is meaningless for quality control. If OCR succeeds, confidence is always high. The entire low-confidence routing path was useless.
 
-**Lesson:** When a module abstracts something you care about, sometimes you have to go one level below it.
+**The fix:** Switched from document mode to image mode. Instead of letting Make pre-process the file, the workflow passes the raw image directly to Gemini Vision. Gemini now sees the same pixels a human would see. A faded, hard-to-read document looks faded and hard to read — and gets a low confidence score. A clean document gets a high one.
+
+This is what makes the quality control path actually work. The Industrial Fasteners packing slip (intentionally degraded as a test case) scores 0.6 in image mode. In document mode it would have scored 1.0 and been processed silently with bad data.
+
+**Lesson:** If your system needs to distinguish document quality, you must pass the visual information — not a cleaned-up version of it. The abstraction that makes things easier is the same abstraction that destroys the signal you need.
 
 ---
 

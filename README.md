@@ -186,10 +186,10 @@ The first version used Make's built-in document extractor. Gemini returned prose
 
 **Fix:** Rewrote the Gemini prompt to explicitly say "Return ONLY valid JSON. No explanation, no markdown." Added strict output structure with an example. Pass rate went from ~60% to ~97%.
 
-### 2. Confidence scoring unreliable on scanned documents
-The document extractor module returned inconsistent confidence scores on grayscale scans. Same document, different scores on repeat runs.
+### 2. Document extractor breaks the entire confidence system
+Testing with deliberately degraded, hard-to-read documents returned confidence scores of 1.0 every time. Make's AI Content Extractor runs OCR *before* passing anything to Gemini — it converts the image to clean text first. By the time Gemini sees it, the visual quality information is already gone. You can't make a hard-to-read document in document mode because no matter what it looks like, the computer reads it perfectly.
 
-**Fix:** Switched from the Make AI Content Extractor (document mode) to image mode, passing the file as a raw image to Gemini Vision rather than as a "document." This bypassed Make's pre-processing layer and let Gemini assess the image directly. Scores became consistent.
+**Fix:** Switched to image mode. The workflow now passes the raw image directly to Gemini Vision. Gemini sees the same pixels a human would — a faded document looks faded, and gets a low confidence score. This is the only way the quality control routing path actually works.
 
 ### 3. Duplicate email alerts
 The low-stock alert triggered once per processed line item. A packing slip with 8 parts at or below reorder threshold sent 8 separate emails.
